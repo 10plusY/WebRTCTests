@@ -12,9 +12,11 @@
 (defonce google-stun-server
   #js {:iceServers [{:url "stun:stun.l.google.com:19302"}]})
 
-(def peer-connection nil)
+(def local-peer-connection nil)
+(def remote-peer-connection nil)
 
-(defn open-stream []
+;Media functions/events
+(defn open-local-stream []
   (let [success (fn [stream]
                   (let [video (. js/document (getElementById "in"))
                         src-url (.. js/window -URL (createObjectURL stream))]
@@ -27,12 +29,20 @@
                                          success
                                          failure))))
 
-;network exchange
+;RTC functions/events
 
-(defn open-peer-connection [servers]
-  (let [conn (js/webkitRTCPeerConnection.
-                servers #js {:optional [{:RTPDataChannels true}]})]
-    (set! peer-connection conn)))
+;TODO: method for generic connection
+;connect for local peer
+(defn open-local-peer-connection [servers]
+  (set! local-peer-connection
+    (js/webkitRTCPeerConnection.
+      servers #js {:optional [{:RTPDataChannels true}]})))
+
+;connect for remote peer
+(defn open-remote-peer-connection [servers]
+  (set! remote-peer-connection
+    (js/webkitRTCPeerConnection.
+      servers #js {:optional [{:RTPDataChannels true}]})))
 
 
 ;when ice candidate is found
@@ -46,7 +56,7 @@
      [:div.in
       [:h2 "In"]
       [:video {:id "in"}]
-      [:button {:on-click (fn [e] (open-stream))}
+      [:button {:on-click (fn [e] (open-local-stream))}
        "Connect"]]
      [:div.out
       [:h2 "Out"]
