@@ -3,6 +3,12 @@
 
 (enable-console-print!)
 
+(defonce constraints
+  #js {:video
+        #js {:mandatory
+             #js {:maxWidth 320
+                  :maxHeight 180}}})
+
 (defn open-stream []
   (let [success (fn [stream]
                   (let [video (. js/document (querySelector "video"))
@@ -11,8 +17,7 @@
                     (set! (.-onloadedmetadata video) (fn [e] (.play video)))))
         failure (fn [error]
                   (. js/console (log "Cannot get user media...")))]
-    (.. js/navigator (webkitGetUserMedia #js {:video #js {:mandatory #js {:maxWidth 320
-                                                                          :maxHeight 180}}}
+    (.. js/navigator (webkitGetUserMedia constraints
                                          success
                                          failure))))
 
