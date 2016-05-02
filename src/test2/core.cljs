@@ -24,7 +24,7 @@
                     (set! (.-onloadedmetadata video) (fn [e] (.play video)))))
         failure (fn [error]
                   (println "Cannot get user media...")
-                  (println (.message error)))]
+                  (println (.-message error)))]
     (.. js/navigator (webkitGetUserMedia constraints
                                          success
                                          failure))))
@@ -44,6 +44,25 @@
     (js/webkitRTCPeerConnection.
       servers #js {:optional [{:RTPDataChannels true}]})))
 
+;create ice candidate for opposite peer
+(defn create-ice-candidate [connection event]
+  (when-let [candidate (.-candidate event)]
+    (let [opposite-candidate (js/RTCIceCandidate.
+                              candidate
+                              (fn [] (println "Success..."))
+                              (fn [e] (println (.-message e))))]
+      (. connection (addIceCandidate opposite-candidate)))))
+
+;connect two peers
+(defn connect-peers []
+  (open-local-peer-connection nil)
+  (open-remote-peer-connection nil)
+  (set! (.-onicecandidate local-peer-connection)
+    (fn [e]
+      (create-ice-candidate local-peer-connection e)))
+  (set! (.-onicecandidate remote-peer-connection)
+    (fn [e]
+      (create-ice-candidate remote-peer-connection e))))
 
 ;when ice candidate is found
 
