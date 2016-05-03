@@ -10,14 +10,23 @@
                  [org.clojure/clojurescript "1.7.228"]
                  [org.clojure/core.async "0.2.374"
                   :exclusions [org.clojure/tools.reader]]
-                 [reagent "0.5.1"]]
+                 [ring "1.4.0"]
+                 [com.taoensso/sente "1.8.1"]
+                 [compojure "1.5.0"]
+                 [reagent "0.5.1"]
+                 [http-kit "2.1.18"]]
 
   :plugins [[lein-figwheel "0.5.2"]
-            [lein-cljsbuild "1.1.3" :exclusions [[org.clojure/clojure]]]]
+            [lein-cljsbuild "1.1.3" :exclusions [[org.clojure/clojure]]]
+            ]
 
   :source-paths ["src"]
 
+  :main server.core
+
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
+
+  :ring {:handler server.core/app}
 
   :cljsbuild {:builds
               [{:id "dev"
