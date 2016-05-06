@@ -14,7 +14,10 @@
                  [com.taoensso/sente "1.8.1"]
                  [compojure "1.5.0"]
                  [reagent "0.5.1"]
-                 [http-kit "2.1.18"]]
+                 [http-kit "2.1.18"]
+                 [lein-light-nrepl "0.3.2"]
+                 [org.clojure/data.json "0.2.6"]
+                 ]
 
   :plugins [[lein-figwheel "0.5.2"]
             [lein-cljsbuild "1.1.3" :exclusions [[org.clojure/clojure]]]
@@ -27,6 +30,8 @@
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
 
   :ring {:handler server.core/app}
+
+  :repl-options {:nrepl-middleware [lighttable.nrepl.handler/lighttable-ops]}
 
   :cljsbuild {:builds
               [{:id "dev"
