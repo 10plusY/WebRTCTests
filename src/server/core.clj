@@ -22,7 +22,6 @@
 
 ; websocket get-ice responds with ice json from twilio
 ; use http-kit client to make request to twilio
-(def  foo 3)
 
 (defroutes app-routes
  (GET "/" _ "hello")
@@ -48,13 +47,13 @@
 
 (defn broadcast-ice-candidate [candidate]
   (doseq [user-id (:any @connected-uids)]
-    (chsk-send! user-id [:respond/candidate candidate])))
+    (chsk-send! user-id [:respond/candidate {:candidate candidate}])))
 
 (defn broadcast-session-description [description]
   (doseq [user-id (:any @connected-uids)]
-    (chsk-send! user-id [:respond/description description])))
+    (chsk-send! user-id [:respond/description {:description description}])))
 
-;ws event handlers
+;--WS EVENTS--
 (defmulti event-msg-handler :id)
 
 (defn event-msg-handler* [{:as ev-msg :keys [id ?data event]}]
@@ -73,13 +72,13 @@
 
 (defmethod event-msg-handler :post/candidate
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-    (let [candidate ?data]
-      (broadcast-ice-candidate candidate)))
+    (let [can-string (get ?data :candidate)]
+      (broadcast-ice-candidate can-string)))
 
 (defmethod event-msg-handler :post/description
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-    (let [description ?data]
-      (broadcast-session-description description)))
+    (let [desc-string (get ?data :sdp)]
+      (broadcast-session-description desc-string)))
 
 (defonce router_ (atom nil))
 

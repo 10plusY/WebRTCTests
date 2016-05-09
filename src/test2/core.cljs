@@ -33,7 +33,7 @@
 ;decides whether to create description or ice candidate object based on signal
 (defn handle-signal [signal]
   (when-not (@peer-connection)
-    (start-call))
+    #_(start-call))
   (if (.-sdp signal)
     (.setRemoteDescription @peer-connection
                            (js/webkitRTCSessionDescription. (clj->js {:sdp (.-sdp signal)})))
@@ -42,14 +42,12 @@
 
 ;signal route for receiving ice candidate broadcasts
 (defn signal-ice-candidate [candidate]
-  (chsk-send! [:post/candidate {:candidate candidate}]))
+  (chsk-send! [:post/candidate {:candidate (.-candidate candidate)}]))
 
 ;signal route for receiving session description broadcasts
 (defn signal-session-description [description]
   (.setLocalDescription @peer-connection description)
-  (js/console.log "description" description)
-  #_(chsk-send! [:post/description {:type (.-type description)
-                                  :sdp (.-sdp description)}]))
+  (chsk-send! [:post/description {:sdp (.-sdp description)}]))
 
 ;--MEDIA OR CALL EVENTS--
 
@@ -79,8 +77,7 @@
   (reset! peer-connection (js/webkitRTCPeerConnection. (clj->js {:iceServers configuration})))
   (set! (.-onicecandidate @peer-connection)
         (fn [evt]
-          (js/console.log "candidate" (.-candidate evt))
-          #_(signal-ice-candidate (.-candidate evt))))
+          (signal-ice-candidate (.-candidate evt))))
   (set! (.-onaddstream @peer-connection)
         (fn [evt]
           (println "onaddstream" evt)
@@ -91,7 +88,7 @@
 
 ;requests available ice servers - to be fired when page is opened - i.e. when a new client connections to ws server
 (defn request-ice []
-  (chsk-send! [:get/ice-servers]
+  (chsk-send! [:get/ice-servers] 1000
     (fn [servers]
       (create-rtc-connection servers))))
 
@@ -101,7 +98,6 @@
 (defmulti event-msg-handler :id)
 
 (defn event-msg-handler* [{:as ev-msg :keys [id ?data event]}]
-  (println (:event ev-msg))
   (event-msg-handler ev-msg))
 
 (defmethod event-msg-handler :default
@@ -112,20 +108,25 @@
   [_]
   #_(request-ice))
 
+(defmethod event-msg-handler :chsk/recv
+  [{:as ev-msg :keys [event ?data]}]
+  (println "Event" event)
+  (println "Data" ?data))
+
 (defmethod event-msg-handler :respond/candidate
   [{:as ev-msg :keys [id ?data event]}]
   (let [candidate ?data]
+    (js/console.log "received" candidate)
     (handle-signal candidate)))
 
 (defmethod event-msg-handler :respond/description
   [{:as ev-msg :keys [id ?data event]}]
-  (println "received desc" ?data)
   (let [description ?data]
     (handle-signal description)))
 
-
 (defn start-call []
   (set! (.-caller js/window) true)
+  ;TODO - request ICE when page loads
   (request-ice))
 
 (defn rtc-view []
@@ -140,8 +141,7 @@
      [:div.out
       [:h2 "Out"]
       [:video {:id "out"}]
-      [:button {:on-click (fn [e]
-                          )}
+      [:button {:on-click (fn [e] )}
        "Receive"]]]))
 
 (r/render-component [rtc-view]
