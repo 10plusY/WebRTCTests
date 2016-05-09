@@ -45,12 +45,13 @@
                         (get :ice_servers))]
     ice-servers))
 
-(defn broadcast-ice-candidate [candidate]
-  (doseq [user-id (:any @connected-uids)]
+;--BROADCAST EVENTS--
+(defn broadcast-ice-candidate [candidate req-id]
+  (doseq [user-id (:any @connected-uids) :when (not= req-id user-id)]
     (chsk-send! user-id [:respond/candidate candidate])))
 
-(defn broadcast-session-description [description]
-  (doseq [user-id (:any @connected-uids)]
+(defn broadcast-session-description [description req-id]
+  (doseq [user-id (:any @connected-uids) :when (not= req-id user-id)]
     (chsk-send! user-id [:respond/description description])))
 
 ;--WS EVENTS--
@@ -71,14 +72,12 @@
     (?reply-fn (get-ice-servers)))
 
 (defmethod event-msg-handler :post/candidate
-  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-    (let [can-string (get ?data :candidate)]
-      (broadcast-ice-candidate ?data)))
+  [{:as ev-msg :keys [event id ?data ring-req uid ?reply-fn send-fn]}]
+    (broadcast-ice-candidate ?data uid))
 
 (defmethod event-msg-handler :post/description
-  [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
-    (let [desc-string (get ?data :sdp)]
-      (broadcast-session-description ?data)))
+  [{:as ev-msg :keys [event id ?data ring-req uid ?reply-fn send-fn]}]
+    (broadcast-session-description ?data uid))
 
 (defonce router_ (atom nil))
 

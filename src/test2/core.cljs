@@ -28,6 +28,8 @@
 ;RTC peer connection atom
 (def peer-connection (atom nil))
 
+(def is-caller (atom false))
+
 ;--SOCKET SIGNAL EVENTS--
 
 ;decides whether to create description or ice candidate object based on signal
