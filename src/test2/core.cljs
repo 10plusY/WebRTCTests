@@ -32,13 +32,15 @@
 
 ;decides whether to create description or ice candidate object based on signal
 (defn handle-signal [signal]
-  (when-not (@peer-connection)
+  (js/console.log @peer-connection)
+  (when-not @peer-connection
     #_(start-call))
-  (if (.-sdp signal)
-    (.setRemoteDescription @peer-connection
-                           (js/webkitRTCSessionDescription. (clj->js {:sdp (.-sdp signal)})))
-    (.addIceCandidate @peer-connection
-                      (js/webkitRTCIceCandidate. (clj->js {:candidate (-.candidate signal)})))))
+  (if (get signal :sdp)
+    (let [desc (js/RTCSessionDescription. (clj->js {:sdp (get signal :sdp)
+                                                    :type "answer"}))]
+      (.setRemoteDescription @peer-connection desc))
+    (let [ice (js/RTCIceCandidate. (clj->js {:candidate (get signal :candidate)}))]
+      (.addIceCandidate @peer-connection ice))))
 
 ;signal route for receiving ice candidate broadcasts
 (defn signal-ice-candidate [candidate]
@@ -97,6 +99,8 @@
 ;generic event multimethod
 (defmulti event-msg-handler :id)
 
+(defmulti event-handler (fn [[id _]] id))
+
 (defn event-msg-handler* [{:as ev-msg :keys [id ?data event]}]
   (event-msg-handler ev-msg))
 
@@ -110,17 +114,17 @@
 
 (defmethod event-msg-handler :chsk/recv
   [{:as ev-msg :keys [event ?data]}]
-  (println "Event" event)
-  (println "Data" ?data))
+  (event-handler ?data))
 
-(defmethod event-msg-handler :respond/candidate
-  [{:as ev-msg :keys [id ?data event]}]
+;response event multimethod
+
+(defmethod event-handler :respond/candidate
+  [[_ ?data]]
   (let [candidate ?data]
-    (js/console.log "received" candidate)
-    (handle-signal candidate)))
+    #_(handle-signal candidate)))
 
-(defmethod event-msg-handler :respond/description
-  [{:as ev-msg :keys [id ?data event]}]
+(defmethod event-handler :respond/description
+  [[_ ?data]]
   (let [description ?data]
     (handle-signal description)))
 

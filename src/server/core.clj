@@ -47,11 +47,11 @@
 
 (defn broadcast-ice-candidate [candidate]
   (doseq [user-id (:any @connected-uids)]
-    (chsk-send! user-id [:respond/candidate {:candidate candidate}])))
+    (chsk-send! user-id [:respond/candidate candidate])))
 
 (defn broadcast-session-description [description]
   (doseq [user-id (:any @connected-uids)]
-    (chsk-send! user-id [:respond/description {:description description}])))
+    (chsk-send! user-id [:respond/description description])))
 
 ;--WS EVENTS--
 (defmulti event-msg-handler :id)
@@ -73,12 +73,12 @@
 (defmethod event-msg-handler :post/candidate
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
     (let [can-string (get ?data :candidate)]
-      (broadcast-ice-candidate can-string)))
+      (broadcast-ice-candidate ?data)))
 
 (defmethod event-msg-handler :post/description
   [{:as ev-msg :keys [event id ?data ring-req ?reply-fn send-fn]}]
     (let [desc-string (get ?data :sdp)]
-      (broadcast-session-description desc-string)))
+      (broadcast-session-description ?data)))
 
 (defonce router_ (atom nil))
 
