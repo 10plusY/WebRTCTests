@@ -30,6 +30,8 @@
 
 (def is-caller (atom false))
 
+(def local-ice-candidate (atom nil))
+
 (defn who-is-calling []
   (if @is-caller
     "caller"
@@ -40,7 +42,8 @@
 ;signal route for receiving ice candidate broadcasts
 (defn signal-ice-candidate [candidate]
   (when candidate
-    (chsk-send! [:post/candidate {:candidate (.-candidate candidate)}])))
+    (chsk-send! [:post/candidate {:candidate (.-candidate candidate)
+                                  :sdpMLineIndex (.-sdpMLineIndex candidate)}])))
 
 ;signal route for receiving session description broadcasts
 (defn signal-session-description [description]
@@ -91,9 +94,11 @@
   (reset! peer-connection (js/webkitRTCPeerConnection. (clj->js {:iceServers configuration})))
   (set! (.-onicecandidate @peer-connection)
         (fn [evt]
-          #_(let [candidate (.-candidate evt)]
-            (js/console.log candidate)
-            (signal-ice-candidate candidate))))
+          (let [candidate (.-candidate evt)]
+            (when @is-caller
+              (when-not @local-ice-candidate
+                (reset! local-ice-candidate candidate)
+                (signal-ice-candidate candidate))))))
   (set! (.-onaddstream @peer-connection)
         (fn [evt]
           (println "onaddstream" evt)
@@ -133,6 +138,7 @@
 (defmethod event-msg-handler :chsk/handshake
   [{:as ev-msg :keys [id ?data event]}]
   (println "user" event "logged in")
+  (js/console.log "local canidate" @local-ice-candidate)
   (request-ice))
 
 ;response event multimethod
@@ -152,7 +158,7 @@
 (defmethod event-handler :respond/candidate
   [[_ ?data]]
   (let [candidate ?data]
-    #_(println "candidate" ?data)
+    (println "rec candidate" ?data)
     #_(handle-signal candidate)))
 
 (defmethod event-handler :respond/description
