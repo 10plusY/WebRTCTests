@@ -43,6 +43,7 @@
 (defn signal-ice-candidate [candidate]
   (when candidate
     (chsk-send! [:post/candidate {:candidate (.-candidate candidate)
+                                  :sdpMid (.-sdpMid candidate)
                                   :sdpMLineIndex (.-sdpMLineIndex candidate)}])))
 
 ;signal route for receiving session description broadcasts
@@ -66,11 +67,6 @@
 
 (defn create-answer []
   (.createAnswer @peer-connection signal-session-description (fn [err] (println err))))
-
-(defn create-offer-or-answer []
-  (if @is-caller
-    (.createOffer @peer-connection signal-session-description (fn [err] (println err)))
-    (.createAnswer @peer-connection signal-session-description (fn [err] (println err)))))
 
 ;opens media stream and makes offer or answer
 (defn open-local-stream []
@@ -98,6 +94,7 @@
             (when @is-caller
               (when-not @local-ice-candidate
                 (reset! local-ice-candidate candidate)
+                (js/console.log "ice candidate to be used" @local-ice-candidate)
                 (signal-ice-candidate candidate))))))
   (set! (.-onaddstream @peer-connection)
         (fn [evt]
@@ -146,20 +143,22 @@
 ;decides whether to create description or ice candidate object based on signal
 (defn handle-signal [signal]
   (if (get signal :sdp)
-    (let [desc (js/RTCSessionDescription. (clj->js {:sdp (get signal :sdp)
-                                                    :type (get signal :type)}))]
-      (.setRemoteDescription @peer-connection desc)
-      (js/console.log (who-is-calling) "'s PC" @peer-connection)
+    (let [desc-signal (js/RTCSessionDescription. (clj->js {:sdp (get signal :sdp)
+                                                           :type (get signal :type)}))]
+      (.setRemoteDescription @peer-connection desc-signal)
       (when-not @is-caller
         (create-answer)))
-    (let [ice (js/RTCIceCandidate. (clj->js {:candidate (get signal :candidate)}))]
-      (.addIceCandidate @peer-connection ice))))
+    (let [ice-signal (js/RTCIceCandidate. (clj->js {:candidate (get signal :candidate)
+                                                    :sdpMid (get signal :sdpMid)
+                                                    :sdpMLineIndex (get signal :sdpMLineIndex)}))]
+      (js/console.log "created ice cand" ice-signal)
+      (.addIceCandidate @peer-connection ice-signal))))
 
 (defmethod event-handler :respond/candidate
   [[_ ?data]]
   (let [candidate ?data]
     (println "rec candidate" ?data)
-    #_(handle-signal candidate)))
+    (handle-signal candidate)))
 
 (defmethod event-handler :respond/description
   [[_ ?data]]
