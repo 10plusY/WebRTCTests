@@ -30,34 +30,42 @@
 
 (def is-caller (atom false))
 
-;--SOCKET SIGNAL EVENTS--
+(defn who-is-calling []
+  (if @is-caller
+    "caller"
+    "callee"))
 
-;decides whether to create description or ice candidate object based on signal
-(defn handle-signal [signal]
-  (js/console.log @peer-connection)
-  (when-not @peer-connection
-    #_(start-call))
-  (if (get signal :sdp)
-    (let [desc (js/RTCSessionDescription. (clj->js {:sdp (get signal :sdp)
-                                                    :type "answer"}))]
-      (.setRemoteDescription @peer-connection desc))
-    (let [ice (js/RTCIceCandidate. (clj->js {:candidate (get signal :candidate)}))]
-      (.addIceCandidate @peer-connection ice))))
+;--SOCKET SIGNAL EVENTS--
 
 ;signal route for receiving ice candidate broadcasts
 (defn signal-ice-candidate [candidate]
-  (chsk-send! [:post/candidate {:candidate (.-candidate candidate)}]))
+  (when candidate
+    (chsk-send! [:post/candidate {:candidate (.-candidate candidate)}])))
 
 ;signal route for receiving session description broadcasts
 (defn signal-session-description [description]
   (.setLocalDescription @peer-connection description)
-  (chsk-send! [:post/description {:sdp (.-sdp description)}]))
+
+  ;logic to figure out whether to send description again
+  (if (= "offer" (.-type description)) (println "GOT OFFER") (println "GOT ANSWER"))
+  (when @is-caller
+    (chsk-send! [:post/description {:sdp (.-sdp description)
+                                    :type (.-type description)}]))
+  (when (= "answer" (.-type description))
+    (chsk-send! [:post/description {:sdp (.-sdp description)
+                                    :type (.-type description)}])))
 
 ;--MEDIA OR CALL EVENTS--
 
 ;creates offer or answer depending on if client is caller or callee
+(defn create-offer []
+  (.createOffer @peer-connection signal-session-description (fn [err] (println err))))
+
+(defn create-answer []
+  (.createAnswer @peer-connection signal-session-description (fn [err] (println err))))
+
 (defn create-offer-or-answer []
-  (if (.-caller js/window)
+  (if @is-caller
     (.createOffer @peer-connection signal-session-description (fn [err] (println err)))
     (.createAnswer @peer-connection signal-session-description (fn [err] (println err)))))
 
@@ -69,28 +77,32 @@
                     (set! (.-src video-in) src-url)
                     (set! (.-onloadedmetadata video-in) (fn [e] (.play video-in)))
                     (.addStream @peer-connection stream)
-                    (create-offer-or-answer)))
+                    (create-offer)))
         failure (fn [error]
                   (println (.-message error)))]
     (.. js/navigator (webkitGetUserMedia constraints
                                          success
                                          failure))))
 
+;--CALL ENVIRONMENT EVENTS--
+
 ;creates RTC peer connection for client and sets handlers
 (defn create-rtc-connection [configuration]
   (reset! peer-connection (js/webkitRTCPeerConnection. (clj->js {:iceServers configuration})))
   (set! (.-onicecandidate @peer-connection)
         (fn [evt]
-          (signal-ice-candidate (.-candidate evt))))
+          #_(let [candidate (.-candidate evt)]
+            (js/console.log candidate)
+            (signal-ice-candidate candidate))))
   (set! (.-onaddstream @peer-connection)
         (fn [evt]
           (println "onaddstream" evt)
-          (let [video-out (. js/document (getElementById "out"))]
+          #_(let [video-out (. js/document (getElementById "out"))]
             (set! (.-src video-out) (.. js/window -url-out (createObjectURL (.-stream evt))))
             (set! (.-onloadedmetadata video-out) (fn [e] (.play video-out))))))
-  (open-local-stream))
+  (js/console.log "peer init" @peer-connection))
 
-;requests available ice servers - to be fired when page is opened - i.e. when a new client connections to ws server
+;requests available ice servers and passes them on to peer connection constructor
 (defn request-ice []
   (chsk-send! [:get/ice-servers] 1000
     (fn [servers]
@@ -118,11 +130,29 @@
   [{:as ev-msg :keys [event ?data]}]
   (event-handler ?data))
 
+(defmethod event-msg-handler :chsk/handshake
+  [{:as ev-msg :keys [id ?data event]}]
+  (println "user" event "logged in")
+  (request-ice))
+
 ;response event multimethod
+
+;decides whether to create description or ice candidate object based on signal
+(defn handle-signal [signal]
+  (if (get signal :sdp)
+    (let [desc (js/RTCSessionDescription. (clj->js {:sdp (get signal :sdp)
+                                                    :type (get signal :type)}))]
+      (.setRemoteDescription @peer-connection desc)
+      (js/console.log (who-is-calling) "'s PC" @peer-connection)
+      (when-not @is-caller
+        (create-answer)))
+    (let [ice (js/RTCIceCandidate. (clj->js {:candidate (get signal :candidate)}))]
+      (.addIceCandidate @peer-connection ice))))
 
 (defmethod event-handler :respond/candidate
   [[_ ?data]]
   (let [candidate ?data]
+    #_(println "candidate" ?data)
     #_(handle-signal candidate)))
 
 (defmethod event-handler :respond/description
@@ -131,9 +161,9 @@
     (handle-signal description)))
 
 (defn start-call []
-  (set! (.-caller js/window) true)
+  (reset! is-caller true)
   ;TODO - request ICE when page loads
-  (request-ice))
+  (open-local-stream))
 
 (defn rtc-view []
   (fn []
