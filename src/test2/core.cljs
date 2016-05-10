@@ -98,9 +98,10 @@
                 (signal-ice-candidate candidate))))))
   (set! (.-onaddstream @peer-connection)
         (fn [evt]
-          (println "onaddstream" evt)
-          #_(let [video-out (. js/document (getElementById "out"))]
-            (set! (.-src video-out) (.. js/window -url-out (createObjectURL (.-stream evt))))
+          (js/console.log "onaddstream of" (who-is-calling) evt)
+          (let [video-out (. js/document (getElementById "out"))
+                src-url (.. js/window -URL (createObjectURL (.-stream evt)))]
+            (set! (.-src video-out) src-url)
             (set! (.-onloadedmetadata video-out) (fn [e] (.play video-out))))))
   (js/console.log "peer init" @peer-connection))
 
@@ -182,7 +183,7 @@
      [:div.out
       [:h2 "Out"]
       [:video {:id "out"}]
-      [:button {:on-click (fn [e] )}
+      #_[:button {:on-click (fn [e] )}
        "Receive"]]]))
 
 (r/render-component [rtc-view]
